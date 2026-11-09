@@ -1,0 +1,15 @@
+<resources>
+    <string name="plugin_name">Fond d\'écran par tuile</string>
+    <string name="plugin_description">Affiche un fond d\'écran différent selon la tuile sur laquelle vous passez.\n\nURL des images : utilisez {package} (ex. com.netflix.ninja) et/ou {title} (ex. youtube). Exemple : https://monserveur.fr/fonds/{package}.jpg</string>
+    <string name="plugin_uuid">e1de7f6d-0457-4b43-bd65-b471155362e8</string>
+
+    <string name="projectivy_not_installed">Attention : ce plugin nécessite Projectivy Launcher, qui ne semble pas installé.</string>
+
+    <string name="settings">Réglages</string>
+    <string name="setting_template_title">URL des images par tuile</string>
+    <string name="setting_fallback_title">Image par défaut (optionnel)</string>
+    <string name="setting_color_title">Couleur de la tuile si aucune image</string>
+    <string name="not_set">Non défini</string>
+    <string name="on">Activé</string>
+    <string name="off">Désactivé</string>
+</resources>
