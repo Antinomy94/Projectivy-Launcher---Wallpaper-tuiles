@@ -13,10 +13,14 @@ import tv.projectivy.plugin.wallpaperprovider.api.Wallpaper
 import tv.projectivy.plugin.wallpaperprovider.api.WallpaperDisplayMode
 import tv.projectivy.plugin.wallpaperprovider.api.WallpaperType
 
+const val KEY_TITLE_TEMPLATE = "title_template_key"
+const val KEY_LAST_CARD = "last_card_key"
+
 class WallpaperProviderService : Service() {
 
-    // Memorise si une URL existe (evite de refaire une requete a chaque passage sur la tuile)
-    private val existsCache = ConcurrentHashMap<String, Boolean>()
+    // Images trouvees (gardees en memoire) et images introuvables (re-testees apres 30 s)
+    private val okCache = ConcurrentHashMap<String, Boolean>()
+    private val missCache = ConcurrentHashMap<String, Long>()
 
     override fun onCreate() {
         super.onCreate()
@@ -29,8 +33,7 @@ class WallpaperProviderService : Service() {
         override fun getWallpapers(event: Event?): List<Wallpaper> {
             return when (event) {
                 is Event.CardFocused -> wallpaperForCard(event)
-                // Rien a faire pour les autres evenements : on garde le fond actuel
-                else -> emptyList()
+                else -> emptyList() // on garde le fond actuel
             }
         }
 
@@ -38,37 +41,40 @@ class WallpaperProviderService : Service() {
 
         override fun setPreferences(params: String) {
             PreferencesManager.import(params)
-            existsCache.clear()
+            okCache.clear()
+            missCache.clear()
         }
     }
 
     private fun wallpaperForCard(event: Event.CardFocused): List<Wallpaper> {
         val pkg = event.packageName?.trim().orEmpty()
         val title = event.title?.trim().orEmpty()
+        val prefs = PreferencesManager.preferences
 
-        // 1) Image specifique a la tuile (par package et/ou titre)
-        val template = PreferencesManager.urlTemplate
-        if (template.isNotBlank()) {
-            val usesPackage = template.contains("{package}")
-            val usesTitle = template.contains("{title}")
-            val canBuild = (!usesPackage || pkg.isNotEmpty()) && (!usesTitle || title.isNotEmpty())
-            if (canBuild) {
-                val url = fillTemplate(template, pkg, title)
-                if (imageExists(url)) {
-                    return listOf(
-                        Wallpaper(url, WallpaperType.IMAGE, WallpaperDisplayMode.CROP, title = title.ifEmpty { null })
-                    )
-                }
+        // Memorise ce que Projectivy envoie, pour l'afficher dans les reglages du plugin
+        prefs.edit().putString(KEY_LAST_CARD, "titre : \"$title\"\npackage : \"$pkg\"").apply()
+
+        // 1) Image par titre (ex. HDMI), puis 2) image par package (ex. Netflix)
+        val urls = listOfNotNull(
+            buildUrl(prefs.getString(KEY_TITLE_TEMPLATE, "").orEmpty(), pkg, title),
+            buildUrl(PreferencesManager.urlTemplate, pkg, title)
+        ).distinct()
+
+        for (url in urls) {
+            if (imageExists(url)) {
+                return listOf(
+                    Wallpaper(url, WallpaperType.IMAGE, WallpaperDisplayMode.CROP, title = title.ifEmpty { null })
+                )
             }
         }
 
-        // 2) Image par defaut (optionnelle)
+        // 3) Image par defaut (optionnelle)
         val fallback = PreferencesManager.fallbackUrl
         if (fallback.isNotBlank()) {
             return listOf(Wallpaper(fallback, WallpaperType.IMAGE, WallpaperDisplayMode.CROP))
         }
 
-        // 3) Sinon : une couleur unie assortie a la tuile
+        // 4) Sinon : une couleur unie assortie a la tuile
         if (PreferencesManager.useCardColor && event.darkColor != 0) {
             return listOf(Wallpaper(String.format("#%06X", event.darkColor and 0xFFFFFF), WallpaperType.COLOR))
         }
@@ -76,13 +82,21 @@ class WallpaperProviderService : Service() {
         return emptyList()
     }
 
-    private fun fillTemplate(template: String, pkg: String, title: String): String =
-        template
+    // Renvoie null si le modele est vide ou s'il demande une valeur que la tuile n'a pas
+    private fun buildUrl(template: String, pkg: String, title: String): String? {
+        if (template.isBlank()) return null
+        if (template.contains("{package}") && pkg.isEmpty()) return null
+        if (template.contains("{title}") && title.isEmpty()) return null
+        return template
             .replace("{package}", Uri.encode(pkg))
             .replace("{title}", Uri.encode(title.lowercase().replace(" ", "-")))
+    }
 
     private fun imageExists(url: String): Boolean {
-        existsCache[url]?.let { return it }
+        if (okCache.containsKey(url)) return true
+        val missAt = missCache[url]
+        if (missAt != null && System.currentTimeMillis() - missAt < 30_000) return false
+
         val ok = try {
             if (url.startsWith("http://") || url.startsWith("https://")) {
                 val c = URL(url).openConnection() as HttpURLConnection
@@ -94,12 +108,12 @@ class WallpaperProviderService : Service() {
                 c.disconnect()
                 code in 200..299
             } else {
-                true // content://, file://... : on laisse Projectivy essayer
+                true
             }
         } catch (e: Exception) {
             false
         }
-        existsCache[url] = ok
+        if (ok) okCache[url] = true else missCache[url] = System.currentTimeMillis()
         return ok
     }
 }
