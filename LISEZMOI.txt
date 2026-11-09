@@ -1,0 +1,17 @@
+PLUGIN PROJECTIVY - FOND D'ECRAN PAR TUILE
+
+OBTENIR L'APK (sans rien installer sur le PC)
+1. Creez un depot GitHub (gratuit) et envoyez-y le contenu de ce dossier.
+2. Onglet "Actions" > "Build APK" > attendez la fin (3-5 min).
+3. Telechargez l'artefact "fond-ecran-par-tuile-apk" (zip contenant l'APK).
+
+INSTALLER SUR LA TV XIAOMI
+- Copiez l'APK via Downloader / Send Files to TV / adb install.
+
+ACTIVER
+- Projectivy > Parametres > Apparence > Fond d'ecran > Fond d'ecran du launcher > "Fond d'ecran par tuile".
+- Ouvrez ses reglages et renseignez l'URL des images, ex :
+  https://monserveur.fr/fonds/{package}.jpg
+  {package} = nom de package de l'appli (com.netflix.ninja, com.google.android.youtube.tv...)
+  {title}   = titre de la tuile en minuscules, espaces remplaces par des tirets
+- Sans image trouvee : image par defaut si renseignee, sinon couleur de la tuile.
